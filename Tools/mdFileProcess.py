@@ -5,11 +5,13 @@ class MdFileProcessor:
     
     def __init__(
         self, 
-        input_folder = "media"
+        input_folder = "media",
+        prefix = "",
         ):
         self.script_path = Path(__file__).parent
         self.input_folder = input_folder
         self.input_dir = self.script_path / self.input_folder
+        self.prefix = prefix
 
 
     def find_markdown_files(self) -> list[Path]:
@@ -72,19 +74,34 @@ class MdFileProcessor:
         try:
             with open(mdfile_path, 'r', encoding='utf-8') as file:
                 lines = file.readlines()
-
             for line in lines:
                 line_stripped = line.strip()
                 if re.match(r'^!\[\[.*?\]\]$', line_stripped):
                     media_name = line_stripped[3:-2].split('/')[-1].split('|')[0]
                     for audio_file in audio_files:
-                        if media_name in audio_file.name:
-                            audio_relative_path = f"Genshin/Furina/{self.input_folder}/{audio_file.name}"
+                        if audio_file.name[:len(self.prefix)] == self.prefix:
+                            if media_name == audio_file.name[len(self.prefix):]:
+                                audio_relative_path = f"{self.input_folder}/{audio_file.name}"
+                                new_lines.append(f"![[{audio_relative_path}]]\n")
+                        elif media_name[:len(self.prefix)] == self.prefix:
+                            if media_name[len(self.prefix):] == audio_file.name:
+                                audio_relative_path = f"{self.input_folder}/{audio_file.name}"
+                                new_lines.append(f"![[{audio_relative_path}]]\n")
+                        elif media_name == audio_file.name:
+                            audio_relative_path = f"{self.input_folder}/{audio_file.name}"
                             new_lines.append(f"![[{audio_relative_path}]]\n")
                             
                     for image_file in image_files:
-                        if media_name in image_file.name:
-                            image_relative_path = f"Genshin/Furina/{self.input_folder}/{image_file.name}"
+                        if image_file.name[:len(self.prefix)] == self.prefix:
+                            if media_name in image_file.name[len(self.prefix):]:
+                                image_relative_path = f"{self.input_folder}/{image_file.name}"
+                                new_lines.append(f"![[{image_relative_path}]]\n")
+                        elif media_name[:len(self.prefix)] == self.prefix:
+                            if media_name[len(self.prefix):] in image_file.name:
+                                image_relative_path = f"{self.input_folder}/{image_file.name}"
+                                new_lines.append(f"![[{image_relative_path}]]\n")
+                        elif media_name in image_file.name:
+                            image_relative_path = f"{self.input_folder}/{image_file.name}"
                             new_lines.append(f"![[{image_relative_path}]]\n")
                 else:
                     new_lines.append(line)
@@ -95,17 +112,21 @@ class MdFileProcessor:
         except Exception as e:
             print(f"Error in update media path: {str(e)}")
 
+class ui:
+    def __init__(self):
+        pass
+    
 
 
 if __name__ == "__main__":
-    processor = MdFileProcessor()
+    processor = MdFileProcessor(prefix="Furina_")
     markdown_files = processor.find_markdown_files()
 
     print("1. Add DELETE")
     print("2. Delete IDs")
     print("3. Update media path")
     Function_selection = input("\nSelect a function(1-3): ")
-    
+
 
 
     if not markdown_files:
