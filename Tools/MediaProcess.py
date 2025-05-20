@@ -147,6 +147,8 @@ class Batch_Modify_Filename:
                 file.rename(output_path)
                 print(f"Delete Prefix: {file.name} -> {new_name}")
 
+    
+
 
 
 
@@ -170,8 +172,8 @@ if __name__ == "__main__":
     
     print("\nAvailable functions:")
     print("1. Remove silence of the beginning and end")
-    print("2. Compress and Convert FLAC files to MP3")
-    print("3. Trim & Compress Convert FLAC files")
+    print("2. Compress Convert FLAC files to MP3")
+    print("3. Integrate all process of FLAC files")
     print("4. Add prefix")
     print("5. Delete prefix")
     choice = input("Enter your choice: ")
@@ -182,6 +184,7 @@ if __name__ == "__main__":
         flacprocess.batch_compress_to_mp3()
     elif choice == "3":
         flacprocess.trim_and_convert_flac()
+        filename.add_prefix(f"{filename.script_dir}_")
     elif choice == "4":
         filename.add_prefix(input("Input prefix: "))
     elif choice == "5":
