@@ -2,13 +2,14 @@ from pathlib import Path
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 
+
 class FlacProcess:
     VALID_SAMPLE_RATES = {22050, 32000, 44100, 48000}
     VALID_BITRATES = {"32k", "64k", "96k", "128k", "192k", "256k", "320k"}
 
     def __init__(
         self,
-        input_folder="OriginalVoice",
+        input_folder="OriginalSources",
         output_directory=None,
         sample_rate=32000,
         bitrate="256k",
@@ -23,7 +24,7 @@ class FlacProcess:
         self.output_dir = self.input_dir.parent if output_directory is None else Path(output_directory)
         self.output_dir_trimmed = self.output_dir / "Trimmed_audio"
         self.output_dir_compressed = self.output_dir / "Compressed_audio"
-        self.output_dir_finalname = self.output_dir / "media"
+        self.output_dir_final = self.output_dir / "media"
         self.sample_rate = sample_rate
         self.bitrate = bitrate
         self.channels = channels
@@ -99,30 +100,42 @@ class FlacProcess:
         if not flac_files:
             print(f"No FLAC file found in {self.input_dir}")
             return
-        self.output_dir_finalname.mkdir(parents=True, exist_ok=True)
+        self.output_dir_final.mkdir(parents=True, exist_ok=True)
         
         for flac_file in flac_files:
             try:
                 audio = AudioSegment.from_file(flac_file, format="flac")
                 trim_audio = self.strip_silence(audio)
                 processed_audio = trim_audio.set_frame_rate(self.sample_rate).set_channels(self.channels)
-                output_path = self.output_dir_finalname / f"{flac_file.stem}.mp3"
+                output_path = self.output_dir_final / f"{flac_file.stem}.mp3"
                 processed_audio.export(output_path, format="mp3", bitrate=self.bitrate)
                 print(f"Trim & Compress Convert: {flac_file.name} -> {output_path.name}")
             except Exception as e:
                 print(f"Error Compressing and converting {flac_file}: {str(e)}")
 
+    def remove_pngfile(self, source_dir, target_dir):
+        png_files = list(self.input_dir.glob("*.png"))
+        if not png_files:
+            print(f"No png file found in {self.input_dir}")
+            return
+        
+        self.output_dir_final.mkdir(parents=True, exist_ok=True)
+        for png_file in png_files:
+            output_path = self.output_dir_final / png_file.name
+            output_path.write_bytes(png_file.read_bytes())
+            print(f"Copied: {png_file} -> {self.output_dir_final}")
 
 class Batch_Modify_Filename:
-    def __init__(self):
+    def __init__(self, input_folder="media"):
         self.script_dir = Path(__file__).parent
-        self.input_dir = self.script_dir / "media"
+        self.input_folder = input_folder
+        self.input_dir = self.script_dir / self.input_folder
 
+    def add_prefix(self, prefix):
         if not self.input_dir.exists():
             print(f"Input directory {self.input_dir} does not exist.")
             exit()
-
-    def add_prefix(self, prefix):
+        
         media_files = list(self.input_dir.glob("*.mp3")) + list(self.input_dir.glob("*.png"))
         if not media_files:
             print(f"No mp3 and png files in {self.input_dir}")
@@ -135,6 +148,10 @@ class Batch_Modify_Filename:
             print(f"Add prefix: {file.name} -> {new_name}")
 
     def delete_prefix(self, prefix):
+        if not self.input_dir.exists():
+            print(f"Input directory {self.input_dir} does not exist.")
+            exit()
+
         media_files = list(self.input_dir.glob(f"{prefix}*.mp3")) + list(self.input_dir.glob(f"{prefix}*.png"))
         if not media_files:
             print(f"No mp3 and png files with '{prefix}' in {self.input_dir}")
@@ -150,12 +167,10 @@ class Batch_Modify_Filename:
     
 
 
-
-
 if __name__ == "__main__":
 
     flacprocess = FlacProcess(
-        input_folder= "OriginalVoice",
+        input_folder= "OriginalSources",
         sample_rate= 32000,
         bitrate= "128k",
         channels= 1,
@@ -184,7 +199,8 @@ if __name__ == "__main__":
         flacprocess.batch_compress_to_mp3()
     elif choice == "3":
         flacprocess.trim_and_convert_flac()
-        filename.add_prefix(f"{filename.script_dir}_")
+        flacprocess.remove_pngfile(flacprocess.input_dir, flacprocess.output_dir_final)
+        filename.add_prefix(f"{filename.script_dir.name}_")
     elif choice == "4":
         filename.add_prefix(input("Input prefix: "))
     elif choice == "5":

@@ -53,7 +53,7 @@ class MdFileGenerate:
                 image = image_files.get(file_stem)
                 self.write_card(f,audio,image)
                 print(f"Created card for: {file_stem}")
-        print(f"Cards generated successfully in: {output_path}")
+        print(f"\nCards generated successfully in: {output_path}\n")
 
     def count_cards(self,file_path):
         try:
@@ -202,7 +202,7 @@ class ui:
 
 
 if __name__ == "__main__":
-    processor = MdFileGenerate(prefix="Furina_")
+    processor = MdFileGenerate(input_folder="media", prefix="")
     markdown_files = processor.find_markdown_files()
 
     print("1. Count Cards")
