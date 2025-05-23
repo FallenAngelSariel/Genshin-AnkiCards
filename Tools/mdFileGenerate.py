@@ -5,11 +5,11 @@ class MdFileGenerate:
     
     def __init__(
         self, 
-        input_folder = "media",
-
+        script_dir=Path(__file__).parent,
+        input_folder="media",
         prefix = ""
         ):
-        self.script_dir = Path(__file__).parent
+        self.script_dir = script_dir
         self.input_folder = input_folder
         self.input_dir = self.script_dir / self.input_folder
         self.attachment_dir = self.script_dir  / "attachments"
@@ -46,14 +46,32 @@ class MdFileGenerate:
         all_files = set(audio_files.keys()).union(set(image_files.keys()))
 
         output_path = self.input_dir.parent / f"{self.script_dir.name}.md"
-        with open(output_path, "w", encoding='utf-8') as f:
-            self.write_header(f)
-            for file_stem in sorted(all_files):
-                audio = audio_files.get(file_stem)
-                image = image_files.get(file_stem)
-                self.write_card(f,audio,image)
-                print(f"Created card for: {file_stem}")
-        print(f"\nCards generated successfully in: {output_path}\n")
+        if not output_path.exists():
+            with open(output_path, "r", encoding='utf-8') as f:
+                self.write_header(f)
+                for file_stem in sorted(all_files):
+                    audio = audio_files.get(file_stem)
+                    image = image_files.get(file_stem)
+                    self.write_card(f,audio,image)
+            print(f"successfully created {self.count_cards(output_path)} cards")
+        else:
+            existing_cards = set()
+            with open(output_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if re.match('^!\[\[.*?\]\]$', line):
+                        stem = line.strip()[3:-2].split('/')[-1].split(".")[0]
+                        existing_cards.add(stem)
+            new_files = all_files - existing_cards
+            if new_files:
+                with open(output_path, 'a', encoding='utf-8') as f:
+                    for new_files in sorted(new_files):
+                        audio = audio_files.get(new_files)
+                        image = image_files.get(new_files)
+                        self.write_card(f,audio,image)
+                    print(f"Added {len(new_files)} new cards to existing file")
+            else:
+                print("No new cards to add")
+                print(f"total cards: {self.count_cards(output_path)}")
 
     def count_cards(self,file_path):
         try:

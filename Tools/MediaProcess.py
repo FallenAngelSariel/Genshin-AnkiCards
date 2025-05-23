@@ -15,7 +15,7 @@ class FlacProcess:
         bitrate="256k",
         channels=1,
         silence_threshold=-50,
-        min_silence_duration=500,
+        min_silence_duration=700,
         padding_duration=300
     ):
         self.script_dir = Path(__file__).parent
@@ -175,7 +175,7 @@ if __name__ == "__main__":
         bitrate= "128k",
         channels= 1,
         silence_threshold= -50,
-        min_silence_duration= 600,
+        min_silence_duration= 700,
         padding_duration= 300
     )
     
