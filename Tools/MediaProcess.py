@@ -1,16 +1,18 @@
 from pathlib import Path
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
+from typing import Callable
 
+PATH_VOICE_ORIGINAL = "Voice_Original"
+PATH_VOICE = "Voice"
+PATH_STORY = "Story"
 
-class FlacProcess:
+class Preprocess:
     VALID_SAMPLE_RATES = {22050, 32000, 44100, 48000}
     VALID_BITRATES = {"32k", "64k", "96k", "128k", "192k", "256k", "320k"}
 
     def __init__(
         self,
-        input_folder="OriginalSources",
-        output_directory=None,
         sample_rate=32000,
         bitrate="256k",
         channels=1,
@@ -18,13 +20,6 @@ class FlacProcess:
         min_silence_duration=700,
         padding_duration=300
     ):
-        self.script_dir = Path(__file__).parent
-        self.input_folder = input_folder
-        self.input_dir = self.script_dir / self.input_folder
-        self.output_dir = self.input_dir.parent if output_directory is None else Path(output_directory)
-        self.output_dir_trimmed = self.output_dir / "Trimmed_audio"
-        self.output_dir_compressed = self.output_dir / "Compressed_audio"
-        self.output_dir_final = self.output_dir / "media"
         self.sample_rate = sample_rate
         self.bitrate = bitrate
         self.channels = channels
@@ -32,16 +27,54 @@ class FlacProcess:
         self.min_silence_duration = min_silence_duration
         self.padding_duration = padding_duration
 
-        if not self.input_dir.exists():
-            raise FileNotFoundError(f"Input directory {self.input_dir} does not exist.")
+        self.allow_folders = {"Voice_Original","Story", "Voice"}
+        self.functions = [
+            {"name": "Full Preparations", "action": lambda prep, input_dir_path: (
+                prep.prepare_audio_assets(input_dir_path),
+                prep.copy_pngfile(input_dir_path, input_dir_path.parent/PATH_VOICE),
+                prep.add_prefix(prefix=f"{input_dir_path.parent.name}_", input_dir_path=input_dir_path.parent/PATH_VOICE)
+            )},
+            {'name': "add prefix", "action": lambda prep, input_dir_path: 
+                prep.add_prefix(prefix=f"{input_dir_path.parent.name}_", input_dir_path=input_dir_path)
+            },
+            {'name': "Delete prefix", "action": lambda prep, input_dir_path:
+                prep.delete_prefix(prefix=input("enter delete prefix: "), input_dir_path=input_dir_path)
+            }
+        ]
 
+    @staticmethod
+    def is_valid_directory(path:Path):
+        if not path.exists():
+            print(f"{path} Does not exist.")
+            exit()
 
-    def count_flac_files(self):
-        '''count the number of FLAC files in the input directory'''
-        return len(list(self.input_dir.glob("*.flac")))
-        
+    def _process_audio(
+        self,
+        input_dir_path: Path,
+        output_subdir: str,
+        file_extension: str,
+        *process_funcs: Callable[[AudioSegment],AudioSegment],
+        output_format: str = "flac"
+    ) -> None:
+        '''chulimuluzhongdeyinpinwenjian'''
+        self.is_valid_directory(input_dir_path)
+        output_dir_path = input_dir_path.parent / output_subdir
+        output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    def strip_silence(self, audio_segment):
+        input_files = list(input_dir_path.glob(f"*.{file_extension}"))
+        for input_file in input_files:
+            try:
+                audio = AudioSegment.from_file(input_file, format=file_extension)
+                processed_audio = audio
+                for func in process_funcs:
+                    processed_audio = func(processed_audio)
+
+                output_path = output_dir_path / f"{input_file.stem}.{output_format}"
+                processed_audio.export(output_path, format=output_format)
+            except Exception as e:
+                print(f"Error Processing {input_file}: {str(e)}")
+
+    def trim_edge_silence(self, audio_segment):
         '''remove silence of the beginning and end of an audio segment'''
         non_silence_sections = detect_nonsilent(
             audio_segment,
@@ -49,128 +82,129 @@ class FlacProcess:
             silence_thresh=self.silence_threshold
         )
         if not non_silence_sections:
-            print("No no-silent segments detected.")
+            print(f"{audio_segment}No no-silent segments detected.")
             return audio_segment
         
         start_time, end_time = non_silence_sections[0][0], non_silence_sections[-1][1]
+        extend_start = max(start_time - self.padding_duration, 0)
         extended_end = min(end_time + self.padding_duration, len(audio_segment))
-        return audio_segment[start_time:extended_end]
-        
+        return audio_segment[extend_start:extended_end]
 
-    def batch_strip_silence(self):
+    def batch_trim_edge_silence(self, input_dir_path):
         '''Process all FALC files in the input directory to remove silence.'''
-        flac_files = list(self.input_dir.glob("*.flac"))
-        if not flac_files:
-            print(f"No flac files found in {self.input_dir}")
-            exit()
-        self.output_dir_trimmed.mkdir(parents=True, exist_ok=True)
-        
-        for flac_file in flac_files:
-            try:
-                audio = AudioSegment.from_file(flac_file, format="flac")
-                trimmed_audio = self.strip_silence(audio)
-                output_path = self.output_dir_trimmed /flac_file.name
-                trimmed_audio.export(output_path, format="flac")
-                print(f"Processed silence removal: {flac_file.name} -> {output_path.name}")
-            except Exception as e:
-                print(f"Error processing {flac_file.name}: {str(e)}")
+        self._process_audio(
+            input_dir_path,
+            "Trim",
+            "flac",
+            self.trim_edge_silence
+        )
 
+    def compress(self, audio_segment):
+        processed_audio = audio_segment.set_frame_rate(self.sample_rate).set_channels(self.channels)
+        return processed_audio
 
-    def batch_compress_to_mp3(self):
+    def batch_compress_to_mp3(self, input_dir_path):
         '''Compress or convert FLAC files to MP3 format.'''
-        flac_files = list(self.output_dir_trimmed.glob("*.flac"))
-        if not self.output_dir_trimmed.exists() or not flac_files:
-            print(f"No trimmed FLAC files found in {self.output_dir_trimmed}. Please run silence_removal first ")
-            return 
-        self.output_dir_compressed.mkdir(parents=True, exist_ok=True)
-        
-        for flac_file in flac_files:
-            try:
-                audio = AudioSegment.from_file(flac_file, format="flac")
-                processed_audio = audio.set_frame_rate(self.sample_rate).set_channels(self.channels)
-                output_path = self.output_dir_compressed / f"{flac_file.stem}.mp3"
-                processed_audio.export(output_path, format="mp3", bitrate=self.bitrate)
-                print(f"Converted: {flac_file.name} -> {output_path.name}")
-            except Exception as e:
-                print(f"Error converting {flac_file.name}: {str(e)}")
+        self._process_audio(
+            input_dir_path,
+            "CompressToMP3",
+            "flac",
+            self.compress,
+            "mp3"
+        )
 
+    def prepare_audio_assets(self, input_dir_path):
+        ''' '''
+        self._process_audio(
+            input_dir_path,
+            PATH_VOICE,
+            "flac",
+            self.trim_edge_silence,
+            self.compress,
+            output_format="mp3"
+        )
 
-    def trim_and_convert_flac(self):
-        flac_files = list(self.input_dir.glob("*.flac"))
-        if not flac_files:
-            print(f"No FLAC file found in {self.input_dir}")
-            return
-        self.output_dir_final.mkdir(parents=True, exist_ok=True)
-        
-        for flac_file in flac_files:
-            try:
-                audio = AudioSegment.from_file(flac_file, format="flac")
-                trim_audio = self.strip_silence(audio)
-                processed_audio = trim_audio.set_frame_rate(self.sample_rate).set_channels(self.channels)
-                output_path = self.output_dir_final / f"{flac_file.stem}.mp3"
-                processed_audio.export(output_path, format="mp3", bitrate=self.bitrate)
-                print(f"Trim & Compress Convert: {flac_file.name} -> {output_path.name}")
-            except Exception as e:
-                print(f"Error Compressing and converting {flac_file}: {str(e)}")
-
-    def remove_pngfile(self, source_dir, target_dir):
-        png_files = list(self.input_dir.glob("*.png"))
+    def copy_pngfile(self, input_dir_path, output_dir_path):
+        self.is_valid_directory(input_dir_path)
+        png_files = list(input_dir_path.glob("*.png"))
         if not png_files:
-            print(f"No png file found in {self.input_dir}")
+            print(f"No png file found in {input_dir_path}")
             return
         
-        self.output_dir_final.mkdir(parents=True, exist_ok=True)
+        output_dir_path.mkdir(parents=True, exist_ok=True)
         for png_file in png_files:
-            output_path = self.output_dir_final / png_file.name
+            output_path = output_dir_path / png_file.name
             output_path.write_bytes(png_file.read_bytes())
-            print(f"Copied: {png_file} -> {self.output_dir_final}")
+        print(f"Total copy pngfile: {len(png_files)}")
 
-class Batch_Modify_Filename:
-    def __init__(self, input_folder="media"):
-        self.script_dir = Path(__file__).parent
-        self.input_folder = input_folder
-        self.input_dir = self.script_dir / self.input_folder
-
-    def add_prefix(self, prefix):
-        if not self.input_dir.exists():
-            print(f"Input directory {self.input_dir} does not exist.")
-            exit()
-        
-        media_files = list(self.input_dir.glob("*.mp3")) + list(self.input_dir.glob("*.png"))
+    def add_prefix(self, prefix, input_dir_path):
+        self.is_valid_directory(input_dir_path)
+        media_files = list(input_dir_path.glob("*.mp3")) + list(input_dir_path.glob("*.png"))
         if not media_files:
-            print(f"No mp3 and png files in {self.input_dir}")
+            print(f"No mp3 or png files in {input_dir_path}")
             return
         
         for file in media_files:
             new_name = f"{prefix}{file.name}"
             output_path = file.with_name(new_name)
             file.rename(output_path)
-            print(f"Add prefix: {file.name} -> {new_name}")
+        print(f"Total add_prefix files: {len(media_files)}")
 
-    def delete_prefix(self, prefix):
-        if not self.input_dir.exists():
-            print(f"Input directory {self.input_dir} does not exist.")
-            exit()
+    def delete_prefix(self, prefix, input_dir_path):
+        self.is_valid_directory(input_dir_path)
 
-        media_files = list(self.input_dir.glob(f"{prefix}*.mp3")) + list(self.input_dir.glob(f"{prefix}*.png"))
+        media_files = list(input_dir_path.glob(f"{prefix}*.mp3")) + list(input_dir_path.glob(f"{prefix}*.png"))
         if not media_files:
-            print(f"No mp3 and png files with '{prefix}' in {self.input_dir}")
+            print(f"No mp3 and png files with '{prefix}' in {input_dir_path}")
             return
         
         for file in media_files:
-            if file.name.startswith(f"{prefix}"):
-                new_name = file.name[len(prefix):]
-                output_path = file.with_name(new_name)
-                file.rename(output_path)
-                print(f"Delete Prefix: {file.name} -> {new_name}")
+            new_name = file.name[len(prefix):]
+            output_path = file.with_name(new_name)
+            file.rename(output_path)
+        print(f"Total Delete_prefix files: {len(media_files)}")
 
+    
+    def select_folder(self):
+        print("searching folders...")
+        script_dir_path = Path(__file__).parent
+
+        folders = [folder for folder in script_dir_path.iterdir()
+                   if folder.is_dir() and folder.name in self.allow_folders]
+        if not folders:
+            print("No folders to be selected.")
+            exit()
+
+        for i, folder in enumerate(folders, 1):
+            print(f"{i}.{folder.name}")
+        choice = int(input("select a folder: "))
+        if 1 <= choice <= len(folders):
+            return folders[choice-1]
+        else:
+            print("please enter a valid number")
+            return None
+
+    def print_functions(self):
+        print("\nAvailable functions:")
+        for i, func in enumerate(self.functions, 1):
+            print(f"{i}. {func['name']}")
+
+    def select_function(self) -> int:
+        self.print_functions()
+        try:
+            choice = int(input("Selecte a function: "))
+            if 1<= choice <= len(self.functions):
+                return choice-1
+            else:
+                print("Please enter a valid number")
+                return None
+        except ValueError:
+            print(f"select function: {ValueError}")
     
 
 
 if __name__ == "__main__":
-
-    flacprocess = FlacProcess(
-        input_folder= "OriginalSources",
+    prep = Preprocess(
         sample_rate= 32000,
         bitrate= "128k",
         channels= 1,
@@ -178,35 +212,13 @@ if __name__ == "__main__":
         min_silence_duration= 700,
         padding_duration= 300
     )
-    
-    filename = Batch_Modify_Filename()
 
-    flac_count = flacprocess.count_flac_files()
-    print(f"\nfind {flac_count} .flac files in {flacprocess.input_dir}")
-    
-    
-    print("\nAvailable functions:")
-    print("1. Remove silence of the beginning and end")
-    print("2. Compress Convert FLAC files to MP3")
-    print("3. Integrate all process of FLAC files")
-    print("4. Add prefix")
-    print("5. Delete prefix")
-    choice = input("Enter your choice: ")
-    
-    if choice == "1":
-        flacprocess.batch_strip_silence()
-    elif choice == "2":
-        flacprocess.batch_compress_to_mp3()
-    elif choice == "3":
-        flacprocess.trim_and_convert_flac()
-        flacprocess.remove_pngfile(flacprocess.input_dir, flacprocess.output_dir_final)
-        filename.add_prefix(f"{filename.script_dir.name}_")
-    elif choice == "4":
-        filename.add_prefix(input("Input prefix: "))
-    elif choice == "5":
-        filename.delete_prefix(input("Input prefix: "))
-    else:
-        print("Invalid Choice.")
+    selected_folder = prep.select_folder()
+    if selected_folder:
+        selected_function_index = prep.select_function()
+        if selected_function_index is not None:
+            selected_func = prep.functions[selected_function_index]["action"]
+            selected_func(prep, selected_folder)
 
 
 
