@@ -10,6 +10,7 @@ Front:
 - **gaping** 
 
 Back:
+你为何呆立在那儿，张口结舌？啊…想必是被震撼得语塞了吧……倒也难怪，毕竟站在你面前的是我——枫丹最耀眼的明星芙宁娜。我的行程可谓分秒必争，能约见一面已是你莫大的荣幸。
 - **gaping** /ˈɡeɪ.pɪŋ/
 	- A gaping hole or other opening is very large.
 	- *The bomb had left gaping holes in the wall.*
@@ -47,8 +48,8 @@ END
 START
 Basic
 Front:
-![](Genshin/Furina/media/Furina_About%20Us%20Relationship.mp3)
-![](Genshin/Furina/media/Furina_About%20Us%20Relationship.png)
+![[media/Furina_About Us Relationship.mp3]]
+![[media/Furina_About Us Relationship.png]]
 
 --- 
 Back:
@@ -592,12 +593,11 @@ END
 START
 Basic
 Front:
-![](Genshin/Furina/media/Furina_More%20About%20Furina%20IV.mp3)
-![](Genshin/Furina/media/Furina_More%20About%20Furina%20IV.png)
+![[media/Furina_More About Furina IV.mp3]]
+![[media/Furina_More About Furina IV.png]]
+
 Back:
 最近我总在想，过去是不是对自己太苛刻了。为了维持神明应有的矜持，我从未有机会享受生活，所以最近才会痴迷于购物。我买了很多珍贵的新东西…比如炫彩茶包，全自动伸缩餐具，还有专门为海马设计的鞍鞯…但最后我发现买来的东西大多没什么用，就都送去剧团当演出道具了。奇怪…买之前我明明觉得它们都很有用…
-
-
 
 Tags: Genshin::Furina
 <!--ID: 1747632402086-->
@@ -790,4 +790,3 @@ Tags: Genshin::Furina
 <!--ID: 1747632402150-->
 END
 
---- 

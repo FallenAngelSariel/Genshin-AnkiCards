@@ -27,7 +27,7 @@ class Preprocess:
         self.min_silence_duration = min_silence_duration
         self.padding_duration = padding_duration
 
-        self.allow_folders = {"Voice_Original","Story", "Voice"}
+        self.allow_folders = {PATH_VOICE_ORIGINAL, PATH_VOICE, PATH_STORY}
         self.functions = [
             {"name": "Full Preparations", "action": lambda prep, input_dir_path: (
                 prep.prepare_audio_assets(input_dir_path),
@@ -39,6 +39,9 @@ class Preprocess:
             },
             {'name': "Delete prefix", "action": lambda prep, input_dir_path:
                 prep.delete_prefix(prefix=input("enter delete prefix: "), input_dir_path=input_dir_path)
+            },
+            {'name': "Change subfix", "action":lambda prep, input_dir_path:
+                prep.change_subfix(input_dir_path)    
             }
         ]
 
@@ -164,6 +167,25 @@ class Preprocess:
             file.rename(output_path)
         print(f"Total Delete_prefix files: {len(media_files)}")
 
+    def change_subfix(self, input_dir_path:Path):
+        self.is_valid_directory(input_dir_path)
+        png_files = list(input_dir_path.glob("*.png"))
+        count = 0
+        for png_file in png_files:
+            file_subfix = png_file.stem.split(" ")[-1].split(".")[0]
+            if file_subfix == "I":
+                count += 1
+                new_name = png_file.with_name(png_file.name.replace(" I", "_1"))
+                png_file.rename(new_name)
+            elif file_subfix == "II":
+                count += 1
+                new_name = png_file.with_name(png_file.name.replace(" II", "_2"))
+                png_file.rename(new_name)
+            elif file_subfix == "III":
+                count += 1
+                new_name = png_file.with_name(png_file.name.replace(" III", "_3"))
+                png_file.rename(new_name)
+        print(f"Total change_subfix files: {count}")
     
     def select_folder(self):
         print("searching folders...")

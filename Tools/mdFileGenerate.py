@@ -246,6 +246,9 @@ class mdFileGenerate_UI:
             },
             {"name": "Generate StoryCards", "action": lambda gene:
                 gene.generate_StoryCards(self.select_folder(self.script_dir))
+            },
+            {"name": "Update media path", "action": lambda gene:
+                gene.update_media_path(self.select_file(self.script_dir), self.select_folder(self.script_dir), f"")
             }
         ]
 
